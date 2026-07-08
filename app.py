@@ -14,7 +14,7 @@ class CorporatePDF(FPDF):
     def draw_form(self, data):
         self.add_page()
         
-        # 한글 폰트 등록
+        # 한글 폰트 등록 (일반 굵기만 등록)
         try:
             self.add_font("Nanum", "", "NanumGothicEco.ttf", uni=True)
             self.set_font("Nanum", "", 10)
@@ -59,8 +59,8 @@ class CorporatePDF(FPDF):
             ["발의일", str(data['initiation_date']), "품의번호", str(data['report_number'])]
         ]
         
-        # 에러를 유발했던 색상 옵션을 제거하고 가장 안정적인 형태로 표 생성
-        with self.table(borders_layout="ALL", line_height=7) as table:
+        # 💡 해결: first_row_as_headings=False 추가 (첫 줄 강제 굵게 방지)
+        with self.table(borders_layout="ALL", line_height=7, first_row_as_headings=False) as table:
             for row in info_data:
                 row_cells = table.row()
                 row_cells.cell(row[0], align="C")
@@ -133,7 +133,8 @@ class CorporatePDF(FPDF):
         ]
         
         self.set_font("Nanum", "", 9.5)
-        with self.table(borders_layout="ALL", line_height=8) as table:
+        # 💡 해결: first_row_as_headings=False 추가 (첫 줄 강제 굵게 방지)
+        with self.table(borders_layout="ALL", line_height=8, first_row_as_headings=False) as table:
             # 헤더 그리기
             header_row = table.row()
             for header in account_headers:
