@@ -26,15 +26,16 @@ class CorporatePDF(FPDF):
         try:
             # A4 너비(210)에서 이미지 너비(70)를 빼고 반으로 나누면 정중앙 X좌표는 70
             self.image("logo.png", x=70, y=15, w=70)
-            self.ln(25) # 로고 크기만큼 아래 공간 충분히 띄우기
+            self.ln(25) # 로고 크기만큼 아래 공간 띄우기
         except:
-            self.ln(15)
+            self.ln(15) # 로고가 없을 경우 대비한 여백
             
-        # 2. 메인 결재 정보 테이블 (수신자, 제목, 회계단위, 적요 등 통합 표)
+        # 2. 메인 결재 정보 테이블 
         self.set_font("Nanum", "", 10.5)
         
+        # [핵심 수정] first_row_as_headings=False 를 추가하여 Bold 폰트 에러 방지
         # col_widths 총합 = 25 + 65 + 25 + 65 = 180 (A4 가용 너비)
-        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(25, 65, 25, 65)) as table:
+        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(25, 65, 25, 65), first_row_as_headings=False) as table:
             # 첫 번째 줄: 수신자 & 경유
             row = table.row()
             row.cell("수신자")
@@ -68,7 +69,7 @@ class CorporatePDF(FPDF):
             
         self.ln(7)
         
-        # 3. 세부 항목 출력 (원본 PDF와 유사한 다목적 텍스트 구조)
+        # 3. 세부 항목 출력
         self.set_font("Nanum", "", 11)
         self.cell(0, 8, "- 다    음 -", ln=True, align="L")
         self.ln(2)
@@ -93,9 +94,10 @@ class CorporatePDF(FPDF):
         self.cell(0, 8, "[채주명세]", ln=True)
         self.ln(2)
         
+        # [핵심 수정] first_row_as_headings=False 추가
         # col_widths 총합 = 40 + 25 + 25 + 25 + 25 + 40 = 180
         self.set_font("Nanum", "", 9.5)
-        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(40, 25, 25, 25, 25, 40)) as table:
+        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(40, 25, 25, 25, 25, 40), first_row_as_headings=False) as table:
             # 헤더
             row = table.row()
             for header in ["채주명", "금액", "공급가액", "부가세", "금융기관", "계좌번호"]:
@@ -133,7 +135,6 @@ with st.form("corporate_expense_form"):
     
     col_header3, col_header4 = st.columns(2)
     with col_header3:
-        # 원본 파일 날짜(2026-02-26)를 기본값으로 세팅
         initiation_date = st.date_input("발의 일", datetime.date(2026, 2, 26))
         initiation_date_str = initiation_date.strftime("%Y-%m-%d")
     with col_header4:
@@ -236,7 +237,7 @@ if submitted:
             pdf.draw_form(payload)
             pdf_bytes = bytes(pdf.output())
             
-            st.success("🎉 에러 없이 완벽한 규격의 PDF 빌드가 완료되었습니다!")
+            st.success("🎉 에러 없이 완벽한 규격의 PDF 빌드가 완료되었습니다! 아래 버튼을 눌러 확인해 보세요.")
             st.download_button(
                 label="💾 완성된 원본 규격 PDF 다운로드",
                 data=pdf_bytes,
