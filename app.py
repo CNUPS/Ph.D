@@ -14,7 +14,7 @@ class CorporatePDF(FPDF):
     def draw_form(self, data):
         self.add_page()
         
-        # 한글 폰트 등록 (일반 굵기만 등록)
+        # 한글 폰트 등록
         try:
             self.add_font("Nanum", "", "NanumGothicEco.ttf", uni=True)
             self.set_font("Nanum", "", 10)
@@ -22,34 +22,32 @@ class CorporatePDF(FPDF):
             st.error("NanumGothicEco.ttf 폰트 파일을 로드할 수 없습니다.")
             return
 
-        # 1. 상단 헤더 영역 (로고 및 문서 타이틀 느낌)
+        # 1. 상단 헤더 영역 (로고 중앙 배치)
         try:
-            # 로고 이미지 좌측 상단 배치 (w=45)
-            self.image("logo.png", x=15, y=12, w=45)
+            # A4 너비(210)에서 이미지 너비(70)를 빼고 반으로 나누면 정중앙 X좌표는 70
+            self.image("logo.png", x=70, y=15, w=70)
+            self.ln(25) # 로고 크기만큼 아래 공간 충분히 띄우기
         except:
-            pass
+            self.ln(15) # 로고 파일이 없을 때의 예외 처리
             
-        self.ln(12)
-        
         # 수신자 정보
         self.set_font("Nanum", "", 11)
-        self.cell(20, 8, "수신자", border=1, align="C")
-        self.cell(40, 8, f" {data['receiver']}", border=1, align="L")
+        self.cell(25, 8, "수신자", border=1, align="C")
+        self.cell(50, 8, f" {data['receiver']}", border=1, align="L")
         self.cell(0, 8, "", ln=True) # 우측 빈공간 (결재란 공간 확보용)
         
-        self.cell(20, 8, "(경  유)", border=1, align="C")
-        self.cell(40, 8, "", border=1)
+        self.cell(25, 8, "(경  유)", border=1, align="C")
+        self.cell(50, 8, "", border=1)
         self.cell(0, 8, "", ln=True)
         
         self.ln(3)
         
         # 제목 영역
-        self.set_font("Nanum", "", 12)
-        self.cell(20, 10, "제    목", border=1, align="C")
-        self.set_font("Nanum", "", 12)
+        self.set_font("Nanum", "", 11)
+        self.cell(25, 10, "제    목", border=1, align="C")
         self.cell(0, 10, f" {data['title']}", border=1, ln=True, align="L")
         
-        self.ln(4)
+        self.ln(5)
         
         # 2. 메인 정보 테이블 (회계단위, 프로젝트, 발의일, 품의번호)
         self.set_font("Nanum", "", 10)
@@ -59,8 +57,7 @@ class CorporatePDF(FPDF):
             ["발의일", str(data['initiation_date']), "품의번호", str(data['report_number'])]
         ]
         
-        # 💡 해결: first_row_as_headings=False 추가 (첫 줄 강제 굵게 방지)
-        with self.table(borders_layout="ALL", line_height=7, first_row_as_headings=False) as table:
+        with self.table(borders_layout="ALL", line_height=7.5, first_row_as_headings=False) as table:
             for row in info_data:
                 row_cells = table.row()
                 row_cells.cell(row[0], align="C")
@@ -68,58 +65,42 @@ class CorporatePDF(FPDF):
                 row_cells.cell(row[2], align="C")
                 row_cells.cell(row[3], align="L")
                 
-        self.ln(4)
+        self.ln(5)
         
         # 적요 서술 칸
         self.set_font("Nanum", "", 10)
-        self.cell(20, 8, "적요", border=1, align="C")
+        self.cell(25, 8, "적요", border=1, align="C")
         self.multi_cell(0, 8, f" {data['summary_desc']}", border=1, align="L")
         
-        self.ln(6)
+        self.ln(7)
         
         # 중간 구분선 대신 내역 시작 안내
         self.set_font("Nanum", "", 11)
         self.cell(0, 8, "- 다    음 -", ln=True, align="L")
         self.ln(2)
         
-        # 3. 세부 항목 출력 (1~5번)
+        # 3. 세부 항목 출력 (글씨 잘림 방지를 위해 한 문장으로 묶어서 multi_cell 적용)
         line_h = 7.5
         self.set_font("Nanum", "", 10.5)
         
-        # 1. 내용
-        self.cell(25, line_h, "1. 내    용 : ", ln=0)
-        self.multi_cell(0, line_h, data['content_detail'])
+        self.multi_cell(0, line_h, f"1. 내    용 : {data['content_detail']}")
+        self.multi_cell(0, line_h, f"2. 일    시 : {data['datetime_str']}")
+        self.multi_cell(0, line_h, f"3. 장    소 : {data['location']}")
+        self.multi_cell(0, line_h, f"4. 참 여 자 : {data['participants']}")
+        self.multi_cell(0, line_h, f"5. 소요예산 : {data['total_budget']:,} 원")
         
-        # 2. 일시
-        self.cell(25, line_h, "2. 일    시 : ", ln=0)
-        self.cell(0, line_h, data['datetime_str'], ln=True)
-        
-        # 3. 장소
-        self.cell(25, line_h, "3. 장    소 : ", ln=0)
-        self.cell(0, line_h, data['location'], ln=True)
-        
-        # 4. 참여자
-        self.cell(25, line_h, "4. 참 여 자 : ", ln=0)
-        self.multi_cell(0, line_h, data['participants'])
-        
-        # 5. 소요예산
-        self.cell(25, line_h, "5. 소요예산 : ", ln=0)
-        self.set_font("Nanum", "", 11)
-        self.cell(0, line_h, f"{data['total_budget']:,} 원", ln=True)
-        
-        # 소요예산 상세 내역 (회의경비 항목)
+        # 소요예산 상세 내역
         self.set_font("Nanum", "", 10)
         detail_budget_str = f"  - {data['expense_type']}: {data['people_count']}인 x {data['cost_per_person']:,}원/인 = {data['total_budget']:,}원"
-        self.cell(0, line_h, detail_budget_str, ln=True)
+        self.multi_cell(0, line_h, detail_budget_str)
         
-        self.ln(6)
+        self.ln(8)
         
-        # 4. 채주명세 타이틀 및 테이블 구조화
+        # 4. 채주명세 타이틀 및 테이블
         self.set_font("Nanum", "", 11)
         self.cell(0, 8, "[채주명세]", ln=True)
         self.ln(2)
         
-        # 채주명세 테이블 헤더 및 데이터 생성
         account_headers = ["채주명", "금액", "공급가액", "부가세", "금융기관", "계좌번호"]
         account_rows = [
             [
@@ -133,13 +114,10 @@ class CorporatePDF(FPDF):
         ]
         
         self.set_font("Nanum", "", 9.5)
-        # 💡 해결: first_row_as_headings=False 추가 (첫 줄 강제 굵게 방지)
         with self.table(borders_layout="ALL", line_height=8, first_row_as_headings=False) as table:
-            # 헤더 그리기
             header_row = table.row()
             for header in account_headers:
                 header_row.cell(header, align="C")
-            # 데이터 행 그리기
             for row in account_rows:
                 data_row = table.row()
                 for item in row:
@@ -243,7 +221,6 @@ with st.form("corporate_expense_form"):
     submitted = st.form_submit_button("원형 규격 반영 PDF 빌드하기")
 
 if submitted:
-    # 묶음 딕셔너리 데이터 전달
     payload = {
         "receiver": receiver,
         "title": title,
@@ -274,7 +251,7 @@ if submitted:
             pdf.draw_form(payload)
             pdf_bytes = bytes(pdf.output())
             
-            st.success("🎉 이상 없이 PDF 빌드가 완료되었습니다!")
+            st.success("🎉 완벽한 규격의 PDF 빌드가 완료되었습니다!")
             st.download_button(
                 label="💾 완성된 원본 규격 PDF 다운로드",
                 data=pdf_bytes,
