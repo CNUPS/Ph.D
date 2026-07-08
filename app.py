@@ -6,7 +6,7 @@ import datetime
 class CorporatePDF(FPDF):
     def __init__(self):
         super().__init__(orientation="P", unit="mm", format="A4")
-        # 여백 설정 (좌, 상, 우) - A4 너비 210mm 기준 좌우 여백 15mm씩 (사용 가능 너비 180mm)
+        # 여백 설정 (좌, 상, 우) 
         self.set_margins(15, 15, 15)
         self.auto_page_break = True
         self.b_margin = 15
@@ -14,55 +14,55 @@ class CorporatePDF(FPDF):
     def draw_form(self, data):
         self.add_page()
         
-        # 한글 폰트 등록
+        # 💡 해결 1: 정규 폰트와 굵은(Bold) 폰트를 모두 등록합니다!
         try:
-            self.add_font("Nanum", "", "NanumGothicEco.ttf", uni=True)
+            self.add_font("Nanum", "", "NanumBarunGothic.ttf", uni=True)
+            self.add_font("Nanum", "B", "NanumBarunGothicBold.ttf", uni=True)
             self.set_font("Nanum", "", 10)
         except Exception as e:
-            st.error("NanumGothicEco.ttf 폰트 파일을 로드할 수 없습니다.")
+            st.error("NanumBarunGothic.ttf 또는 Bold 폰트 파일을 로드할 수 없습니다.")
             return
 
         # 1. 상단 헤더 영역 (로고 중앙 배치)
         try:
-            # A4 너비(210)에서 이미지 너비(70)를 빼고 반으로 나누면 정중앙 X좌표는 70
             self.image("logo.png", x=70, y=15, w=70)
-            self.ln(25) # 로고 크기만큼 아래 공간 띄우기
+            self.ln(25) 
         except:
-            self.ln(15) # 로고가 없을 경우 대비한 여백
+            self.ln(15) 
             
         # 2. 메인 결재 정보 테이블 
         self.set_font("Nanum", "", 10.5)
         
-        # [핵심 수정] first_row_as_headings=False 를 추가하여 Bold 폰트 에러 방지
-        # col_widths 총합 = 25 + 65 + 25 + 65 = 180 (A4 가용 너비)
-        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(25, 65, 25, 65), first_row_as_headings=False) as table:
-            # 첫 번째 줄: 수신자 & 경유
+        # 💡 해결 2: 에러가 났던 고정 너비 대신 '비율(%)'로 너비를 지정하여 공간 에러 원천 차단!
+        # col_widths=(15%, 35%, 15%, 35%)
+        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(15, 35, 15, 35), first_row_as_headings=False) as table:
+            # 첫 번째 줄
             row = table.row()
             row.cell("수신자")
             row.cell(f" {data['receiver']}", align="L")
             row.cell("(경  유)")
             row.cell("")
             
-            # 두 번째 줄: 제목 (colspan을 사용하여 뒤의 3칸을 1칸으로 합침)
+            # 두 번째 줄: 제목 (colspan 적용)
             row = table.row()
             row.cell("제    목")
             row.cell(f" {data['title']}", colspan=3, align="L")
             
-            # 세 번째 줄: 회계단위 & 프로젝트
+            # 세 번째 줄
             row = table.row()
             row.cell("회계단위")
             row.cell(f" {data['accounting_unit']}", align="L")
             row.cell("프로젝트")
             row.cell(f" {data['project_name']}", align="L")
             
-            # 네 번째 줄: 발의일 & 품의번호
+            # 네 번째 줄
             row = table.row()
             row.cell("발의일")
             row.cell(f" {data['initiation_date']}", align="L")
             row.cell("품의번호")
             row.cell(f" {data['report_number']}", align="L")
             
-            # 다섯 번째 줄: 적요
+            # 다섯 번째 줄
             row = table.row()
             row.cell("적    요")
             row.cell(f" {data['summary_desc']}", colspan=3, align="L")
@@ -82,7 +82,7 @@ class CorporatePDF(FPDF):
         self.multi_cell(0, line_h, f"4. 참 여 자: {data['participants']}")
         self.multi_cell(0, line_h, f"5. 소요예산: {data['total_budget']:,} 원")
         
-        # 소요예산 상세 내역 들여쓰기
+        # 소요예산 상세 내역 
         self.set_font("Nanum", "", 10)
         detail_budget_str = f"  - {data['expense_type']}: {data['people_count']}인 x {data['cost_per_person']:,}원/인 = {data['total_budget']:,}원"
         self.multi_cell(0, line_h, detail_budget_str)
@@ -90,15 +90,14 @@ class CorporatePDF(FPDF):
         self.ln(10)
         
         # 4. 채주명세 타이틀 및 테이블
-        self.set_font("Nanum", "", 11)
+        self.set_font("Nanum", "B", 11) # 채주명세 제목은 멋지게 굵은 글씨로!
         self.cell(0, 8, "[채주명세]", ln=True)
         self.ln(2)
         
-        # [핵심 수정] first_row_as_headings=False 추가
-        # col_widths 총합 = 40 + 25 + 25 + 25 + 25 + 40 = 180
+        # 💡 비율로 너비 할당: 합계 100%가 되도록 조정
         self.set_font("Nanum", "", 9.5)
-        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(40, 25, 25, 25, 25, 40), first_row_as_headings=False) as table:
-            # 헤더
+        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(22, 13, 14, 12, 16, 23)) as table:
+            # 헤더 (Bold 폰트가 있으므로 자동으로 헤더가 굵은 글씨로 예쁘게 표시됩니다)
             row = table.row()
             for header in ["채주명", "금액", "공급가액", "부가세", "금융기관", "계좌번호"]:
                 row.cell(header)
