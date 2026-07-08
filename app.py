@@ -54,13 +54,13 @@ class CorporatePDF(FPDF):
         # 2. 메인 정보 테이블 (회계단위, 프로젝트, 발의일, 품의번호)
         self.set_font("Nanum", "", 10)
         
-        # 테이블 데이터 구성
         info_data = [
-            ["회계단위", data['accounting_unit'], "프로젝트", data['project_name']],
-            ["발의일", data['initiation_date'], "품의번호", data['report_number']]
+            ["회계단위", str(data['accounting_unit']), "프로젝트", str(data['project_name'])],
+            ["발의일", str(data['initiation_date']), "품의번호", str(data['report_number'])]
         ]
         
-        with self.table(borders_layout="ALL", cell_fill_color=245, cell_fill_mode="ROWS", line_height=7) as table:
+        # 에러를 유발했던 색상 옵션을 제거하고 가장 안정적인 형태로 표 생성
+        with self.table(borders_layout="ALL", line_height=7) as table:
             for row in info_data:
                 row_cells = table.row()
                 row_cells.cell(row[0], align="C")
@@ -79,7 +79,7 @@ class CorporatePDF(FPDF):
         
         # 중간 구분선 대신 내역 시작 안내
         self.set_font("Nanum", "", 11)
-        self.cell(0, 8, "ㅁ 다음 ㅁ", ln=True, align="L")
+        self.cell(0, 8, "- 다    음 -", ln=True, align="L")
         self.ln(2)
         
         # 3. 세부 항목 출력 (1~5번)
@@ -116,19 +116,19 @@ class CorporatePDF(FPDF):
         
         # 4. 채주명세 타이틀 및 테이블 구조화
         self.set_font("Nanum", "", 11)
-        self.cell(0, 8, "ㅁ 채주명세 ㅁ", ln=True)
+        self.cell(0, 8, "[채주명세]", ln=True)
         self.ln(2)
         
         # 채주명세 테이블 헤더 및 데이터 생성
         account_headers = ["채주명", "금액", "공급가액", "부가세", "금융기관", "계좌번호"]
         account_rows = [
             [
-                data['payee_name'], 
+                str(data['payee_name']), 
                 f"{data['payee_total']:,}", 
                 f"{data['supply_value']:,}", 
                 f"{data['vat']:,}", 
-                data['bank_name'], 
-                data['account_number']
+                str(data['bank_name']), 
+                str(data['account_number'])
             ]
         ]
         
@@ -268,15 +268,17 @@ if submitted:
     }
     
     with st.spinner("문서 인코딩 및 레이아웃을 빌드 중입니다..."):
-        pdf = CorporatePDF()
-        pdf.draw_form(payload)
-        pdf_bytes = bytes(pdf.output())
-        
-    if pdf_bytes:
-        st.success("🎉 이상 없이 PDF 빌드가 완료되었습니다!")
-        st.download_button(
-            label="💾 완성된 원본 규격 PDF 다운로드",
-            data=pdf_bytes,
-            file_name=f"{user_file_name}.pdf",
-            mime="application/pdf"
-        )
+        try:
+            pdf = CorporatePDF()
+            pdf.draw_form(payload)
+            pdf_bytes = bytes(pdf.output())
+            
+            st.success("🎉 이상 없이 PDF 빌드가 완료되었습니다!")
+            st.download_button(
+                label="💾 완성된 원본 규격 PDF 다운로드",
+                data=pdf_bytes,
+                file_name=f"{user_file_name}.pdf",
+                mime="application/pdf"
+            )
+        except Exception as e:
+            st.error(f"PDF 생성 중 오류가 발생했습니다: {e}")
