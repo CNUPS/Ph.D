@@ -76,7 +76,8 @@ def generate_pdf(data):
     pdf.cell(0, line_height, f"{data['vat']:,} 원", ln=True)
     
     # 바이트 데이터로 변환하여 반환
-    return pdf.output(dest="S").encode("latin-1")
+    # 바이트 데이터로 변환하여 반환
+    return bytes(pdf.output())
 
 
 # --- Streamlit UI 구성 ---
