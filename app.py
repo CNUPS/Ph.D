@@ -6,7 +6,7 @@ import datetime
 class CorporatePDF(FPDF):
     def __init__(self):
         super().__init__(orientation="P", unit="mm", format="A4")
-        # 여백 설정 (좌, 상, 우) 
+        # 여백 설정 (좌 15, 상 15, 우 15) -> 가용 너비 = 210 - 30 = 180mm
         self.set_margins(15, 15, 15)
         self.auto_page_break = True
         self.b_margin = 15
@@ -14,194 +14,228 @@ class CorporatePDF(FPDF):
     def draw_form(self, data):
         self.add_page()
         
-        # 💡 해결 1: 정규 폰트와 굵은(Bold) 폰트를 모두 등록합니다!
+        # 폰트 등록 (유저가 업로드한 정규/Bold 폰트 완벽 연동)
         try:
             self.add_font("Nanum", "", "NanumBarunGothic.ttf", uni=True)
             self.add_font("Nanum", "B", "NanumBarunGothicBold.ttf", uni=True)
             self.set_font("Nanum", "", 10)
         except Exception as e:
-            st.error("NanumBarunGothic.ttf 또는 Bold 폰트 파일을 로드할 수 없습니다.")
+            st.error("NanumBarunGothic.ttf 또는 Bold 폰트 파일을 로드할 수 없습니다. 서버 저장소 위치를 확인해주세요.")
             return
 
-        # 1. 상단 헤더 영역 (로고 중앙 배치)
+        # --- 1. 상단 기관 로고 및 내부결재선 영역 ---
+        # 로고 배치 (좌측 상단 y=15, w=50)
         try:
-            self.image("logo.png", x=70, y=15, w=70)
-            self.ln(25) 
+            self.image("logo.png", x=15, y=15, w=50)
         except:
-            self.ln(15) 
-            
-        # 2. 메인 결재 정보 테이블 
-        self.set_font("Nanum", "", 10.5)
+            pass
         
-        # 💡 해결 2: 에러가 났던 고정 너비 대신 '비율(%)'로 너비를 지정하여 공간 에러 원천 차단!
-        # col_widths=(15%, 35%, 15%, 35%)
-        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(15, 35, 15, 35), first_row_as_headings=False) as table:
-            # 첫 번째 줄
-            row = table.row()
-            row.cell("수신자")
-            row.cell(f" {data['receiver']}", align="L")
-            row.cell("(경  유)")
-            row.cell("")
-            
-            # 두 번째 줄: 제목 (colspan 적용)
-            row = table.row()
-            row.cell("제    목")
-            row.cell(f" {data['title']}", colspan=3, align="L")
-            
-            # 세 번째 줄
-            row = table.row()
-            row.cell("회계단위")
-            row.cell(f" {data['accounting_unit']}", align="L")
-            row.cell("프로젝트")
-            row.cell(f" {data['project_name']}", align="L")
-            
-            # 네 번째 줄
-            row = table.row()
-            row.cell("발의일")
-            row.cell(f" {data['initiation_date']}", align="L")
-            row.cell("품의번호")
-            row.cell(f" {data['report_number']}", align="L")
-            
-            # 다섯 번째 줄
-            row = table.row()
-            row.cell("적    요")
-            row.cell(f" {data['summary_desc']}", colspan=3, align="L")
-            
-        self.ln(7)
+        # 결재선 그리기 (우측 상단 정렬)
+        # 테이블 에러를 피하기 위해 절대 좌표 기반 패딩 셀 방식으로 처리
+        self.set_font("Nanum", "B", 9)
+        self.set_xy(145, 15)
+        self.cell(15, 6, "수신자", border=1, align="C")
+        self.cell(35, 6, data["receiver"], border=1, align="C")
         
-        # 3. 세부 항목 출력
-        self.set_font("Nanum", "", 11)
-        self.cell(0, 8, "- 다    음 -", ln=True, align="L")
-        self.ln(2)
+        self.set_xy(145, 21)
+        self.cell(15, 12, "(경유)", border=1, align="C")
+        self.cell(35, 12, "내부결재", border=1, align="C")
         
-        line_h = 7.5
-        self.set_font("Nanum", "", 10.5)
-        self.multi_cell(0, line_h, f"1. 내    용: {data['content_detail']}")
-        self.multi_cell(0, line_h, f"2. 일    시: {data['datetime_str']}")
-        self.multi_cell(0, line_h, f"3. 장    소: {data['location']}")
-        self.multi_cell(0, line_h, f"4. 참 여 자: {data['participants']}")
-        self.multi_cell(0, line_h, f"5. 소요예산: {data['total_budget']:,} 원")
+        self.ln(10) # 결재선 하단 여백 추가
         
-        # 소요예산 상세 내역 
+        # --- 2. 문서 제목 (공식 몽골 PDF 스타일 라인 포인트) ---
+        self.set_y(40)
+        self.set_font("Nanum", "B", 15)
+        # 제목 글자 크기에 맞춰 자동 줄바꿈 지원하면서 에러 방지
+        self.multi_cell(180, 8, data["title"], border=0, align="L")
+        self.ln(3)
+        
+        # 상단 굵은 수평선
+        self.set_line_width(0.6)
+        self.line(15, self.get_y(), 195, self.get_y())
+        self.ln(4)
+        
+        # --- 3. 메타 정보 테이블 (회계단위, 프로젝트, 발의일, 품의번호) ---
         self.set_font("Nanum", "", 10)
-        detail_budget_str = f"  - {data['expense_type']}: {data['people_count']}인 x {data['cost_per_person']:,}원/인 = {data['total_budget']:,}원"
-        self.multi_cell(0, line_h, detail_budget_str)
+        self.set_line_width(0.2)
         
-        self.ln(10)
+        # 1행: 회계단위 / 프로젝트
+        # 명확한 너비 지정으로 'Not enough space' 에러 근본적 차단 (총합 180mm)
+        self.set_fill_color(245, 245, 245)
+        self.cell(25, 8, "회계단위", border=1, align="C", fill=True)
+        self.cell(50, 8, data["accounting_unit"], border=1, align="L")
+        self.cell(25, 8, "프로젝트", border=1, align="C", fill=True)
         
-        # 4. 채주명세 타이틀 및 테이블
-        self.set_font("Nanum", "B", 11) # 채주명세 제목은 멋지게 굵은 글씨로!
-        self.cell(0, 8, "[채주명세]", ln=True)
+        # 프로젝트명 길어질 때 셀 깨짐 방지용 multi_cell 유동적 처리 예방을 위한 가용 너비 배정
+        current_x = self.get_x()
+        current_y = self.get_y()
+        self.multi_cell(80, 8, data["project_name"], border=1, align="L")
+        self.set_xy(current_x + 80, current_y)
+        self.ln(8)
+        
+        # 2행: 발의일 / 품의번호
+        self.cell(25, 8, "발의 일", border=1, align="C", fill=True)
+        self.cell(50, 8, data["initiation_date"], border=1, align="L")
+        self.cell(25, 8, "품의번호", border=1, align="C", fill=True)
+        self.cell(80, 8, str(data["report_number"]), border=1, align="L")
+        self.ln(12)
+        
+        # --- 4. 적요 요약문 영역 ---
+        self.set_font("Nanum", "B", 11)
+        self.cell(180, 6, "적요", ln=True)
+        self.set_font("Nanum", "", 10)
+        self.ln(2)
+        self.multi_cell(180, 6, data["summary_desc"], border=0, align="L")
+        
+        # 구분선
+        self.ln(4)
+        self.set_font("Nanum", "B", 11)
+        self.cell(180, 6, "- 다음 -", ln=True)
         self.ln(2)
         
-        # 💡 비율로 너비 할당: 합계 100%가 되도록 조정
+        # --- 5. 다음 세부 항목 리스트 (1~5번 규격화) ---
+        self.set_font("Nanum", "", 10)
+        line_h = 6
+        
+        # 1. 내용
+        self.set_font("Nanum", "B", 10)
+        self.cell(20, line_h, "1. 내용 : ", border=0)
+        self.set_font("Nanum", "", 10)
+        self.multi_cell(160, line_h, data["content_detail"])
+        
+        # 2. 일시
+        self.set_font("Nanum", "B", 10)
+        self.cell(20, line_h, "2. 일시 : ", border=0)
+        self.set_font("Nanum", "", 10)
+        self.cell(160, line_h, data["datetime_str"], ln=True)
+        
+        # 3. 장소
+        self.set_font("Nanum", "B", 10)
+        self.cell(20, line_h, "3. 장소 : ", border=0)
+        self.set_font("Nanum", "", 10)
+        self.cell(160, line_h, data["location"], ln=True)
+        
+        # 4. 참여자
+        self.set_font("Nanum", "B", 10)
+        self.cell(20, line_h, "4. 참여자 : ", border=0)
+        self.set_font("Nanum", "", 10)
+        self.multi_cell(160, line_h, data["participants"])
+        
+        # 5. 소요예산 및 산출내역
+        self.set_font("Nanum", "B", 10)
+        self.cell(20, line_h, "5. 예산 : ", border=0)
+        self.set_font("Nanum", "", 10)
+        
+        # 금액 포맷팅 추가 (ex: 400,000 원)
+        formatted_total = f"{data['total_budget']:,} 원"
+        self.cell(160, line_h, formatted_total, ln=True)
+        
+        # 하단 디테일 산출 내역 서술형 추가
         self.set_font("Nanum", "", 9.5)
-        with self.table(borders_layout="ALL", text_align="CENTER", line_height=8, col_widths=(22, 13, 14, 12, 16, 23)) as table:
-            # 헤더 (Bold 폰트가 있으므로 자동으로 헤더가 굵은 글씨로 예쁘게 표시됩니다)
-            row = table.row()
-            for header in ["채주명", "금액", "공급가액", "부가세", "금융기관", "계좌번호"]:
-                row.cell(header)
-                
-            # 데이터
-            row = table.row()
-            row.cell(str(data['payee_name']))
-            row.cell(f"{data['payee_total']:,}")
-            row.cell(f"{data['supply_value']:,}")
-            row.cell(f"{data['vat']:,}")
-            row.cell(str(data['bank_name']))
-            row.cell(str(data['account_number']))
+        calc_text = f"  - {data['expense_type']}: {data['people_count']}인 x {data['cost_per_person']:,}원/인 = {data['total_budget']:,}원"
+        self.cell(180, line_h, calc_text, ln=True)
+        self.ln(8)
+        
+        # --- 6. 채주명세서 테이블 (에러 빈발 구간 완벽 패딩화) ---
+        self.set_font("Nanum", "B", 11)
+        self.cell(180, 6, "[채주명세]", ln=True)
+        self.ln(2)
+        
+        self.set_font("Nanum", "", 9)
+        # 테이블 컬럼 너비 분배 공식 수치 적용 (총합 180mm 정확히 일치)
+        col_widths = {
+            "payee": 35,
+            "total": 25,
+            "supply": 25,
+            "vat": 20,
+            "bank": 25,
+            "account": 50
+        }
+        
+        # 채주명세 헤더
+        self.set_fill_color(240, 240, 240)
+        self.cell(col_widths["payee"], 8, "채주명", border=1, align="C", fill=True)
+        self.cell(col_widths["total"], 8, "금액", border=1, align="C", fill=True)
+        self.cell(col_widths["supply"], 8, "공급가액", border=1, align="C", fill=True)
+        self.cell(col_widths["vat"], 8, "부가세", border=1, align="C", fill=True)
+        self.cell(col_widths["bank"], 8, "금융기관", border=1, align="C", fill=True)
+        self.cell(col_widths["account"], 8, "계좌번호", border=1, align="C", fill=True)
+        self.ln()
+        
+        # 채주명세 데이터 행
+        self.cell(col_widths["payee"], 8, data["payee_name"], border=1, align="C")
+        self.cell(col_widths["total"], 8, f"{data['payee_total']:,}", border=1, align="R")
+        self.cell(col_widths["supply"], 8, f"{data['supply_value']:,}", border=1, align="R")
+        self.cell(col_widths["vat"], 8, f"{data['vat']:,}", border=1, align="R")
+        self.cell(col_widths["bank"], 8, data["bank_name"], border=1, align="C")
+        self.cell(col_widths["account"], 8, data["account_number"], border=1, align="L")
+        self.ln(15)
+        
+        # 하단 종료 마감 처리
+        self.set_line_width(0.4)
+        self.line(15, self.get_y(), 195, self.get_y())
 
 
-# --- Streamlit 웹 UI 구성 ---
-st.set_page_config(page_title="한국도로협회 회의비 품의서 시스템", layout="centered")
+# --- Streamlit 인터페이스 대시보드 ---
+st.set_page_config(page_title="한국도로협회 양식 결재문서 빌더", layout="centered")
+st.title("📋 한국도로협회 품의서 빌더 (찐최종 에러 프리 버전)")
+st.caption("몽골 중온 개질 아스팔트 온실가스 감축 타당성 조사 양식 원형 매칭 모델")
 
-st.title("🏛️ 회의비 집행 품의서 시스템")
-st.write("원하는 문서 양식 데이터를 입력하면 오차 없이 양식 규격 PDF를 빌드합니다.")
-
-with st.form("corporate_expense_form"):
-    st.subheader("📋 1. 공문서 결재 기본 정보")
-    
-    col_header1, col_header2 = st.columns(2)
-    with col_header1:
-        receiver = st.selectbox("수신자 구분", ["내부결재", "기타전결", "직접입력"])
-        if receiver == "직접입력":
-            receiver = st.text_input("수신자 직접 입력", value="내부결재")
-    with col_header2:
+with st.form("corporate_form"):
+    st.subheader("1. 문서 정보 및 결재선 설정")
+    c1, c2 = st.columns(2)
+    with c1:
+        receiver = st.text_input("수신자 입력", value="내부결재")
         accounting_unit = st.text_input("회계단위", value="사단법인 한국도로협회")
-        
-    title = st.text_input("문서 제목 (제 목)", value="20260226-스마트인프라연구실-이도근 몽골 중온 개질 아스팔트 온실가스 감축 타당성 조사 회의비 (260226)")
-    project_name = st.text_input("프로젝트 명", value="몽골 중온 개질 아스팔트 온실가스 감축 타당성 조사")
+    with c2:
+        report_number = st.number_input("품의번호", min_value=1, value=4, step=1)
+        initiation_date_str = st.date_input("발의 일자 선택", datetime.date(2026, 2, 26)).strftime("%Y-%m-%d")
+
+    title = st.text_input("문서 제목", value="20260226-스마트인프라연구실-이도근 몽골 중온 개질 아스팔트 온실가스 감축 타당성 조사 회의비(260226)")
+    project_name = st.text_input("프로젝트명", value="몽골 중온 개질 아스팔트 온실가스 감축 타당성 조사")
     
-    col_header3, col_header4 = st.columns(2)
-    with col_header3:
-        initiation_date = st.date_input("발의 일", datetime.date(2026, 2, 26))
-        initiation_date_str = initiation_date.strftime("%Y-%m-%d")
-    with col_header4:
-        report_number = st.text_input("품의번호", value="4")
-        
-    summary_desc = st.text_area(
-        "적요 (상세 설명 문구)", 
-        value="윤성산업개발이 발주한 몽골 중온 개질 아스팔트 온실가스 감축 타당성 조사 용역과 관련하여 다음과 같이 연구회의를 개최하고자 합니다."
-    )
+    st.markdown("---")
+    st.subheader("2. 적요 및 세부 내용")
+    summary_desc = st.text_area("적요 기재란", value="윤성산업개발이 발주한 몽골 중온 개질 아스팔트 온실가스 감축 타당성 조사 용역과 관련하여 다음과 같이 연구회의를 개최하고자 합니다.")
     
-    st.divider()
-    st.subheader("📅 2. 연구 회의 세부 내역 (다음)")
+    content_detail = st.text_input("1. 내용 항목 세부", value="몽골 중온 아스팔트 온실가스 감축 현지조사 및 경제성분석")
+    datetime_str = st.text_input("2. 일시 항목 세부", value="2026.02.26 (목) 14:30~18:30")
+    location = st.text_input("3. 장소 항목 세부", value="서초르호봇")
+    participants = st.text_area("4. 참여자 항목 세부", value="윤성산업개발 임희섭 연구소장, 그리너스 김낙현 대표, 한국도로협회 최지선 실장 등 8명")
     
-    content_detail = st.text_input("1. 내용 항목", value="몽골 중온 아스팔트 온실가스 감축 현지조사 및 경제성분석")
-    
-    col_dt1, col_dt2, col_dt3 = st.columns(3)
-    with col_dt1:
-        date_input = st.date_input("회의 날짜", datetime.date(2026, 2, 26))
-    with col_dt2:
-        start_time = st.time_input("시작 시간", datetime.time(14, 30))
-    with col_dt3:
-        end_time = st.time_input("종료 시간", datetime.time(18, 30))
-        
-    weekdays = ["월", "화", "수", "목", "금", "토", "일"]
-    weekday_str = weekdays[date_input.weekday()]
-    datetime_str = f"{date_input.strftime('%Y.%m.%d')} ({weekday_str}) {start_time.strftime('%H:%M')}~{end_time.strftime('%H:%M')}"
-    
-    location = st.text_input("3. 장소 항목", value="서초르호봇")
-    participants = st.text_area(
-        "4. 참여자 항목", 
-        value="윤성산업개발 임희섭 연구소장, 그리너스 김낙현 대표, 한국도로협회 최지선 실장 등 8명"
-    )
-    
-    st.markdown("**5. 소요예산 산출 자동화**")
+    st.markdown("---")
+    st.subheader("3. 산출금액 및 채주명세 설정")
     expense_type = st.text_input("비용 비목 구분", value="회의경비(식대 및 다과)")
     
-    col_calc1, col_calc2 = st.columns(2)
-    with col_calc1:
-        people_count = st.number_input("참여 인원수 (명)", min_value=1, value=8)
-    with col_calc2:
-        cost_per_person = st.number_input("1인당 배정 금액 (원)", min_value=0, value=50000, step=1000)
-        
-    total_budget = int(people_count * cost_per_person)
-    st.info(f"💡 계산된 총 예산: **{total_budget:,} 원**")
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        people_count = st.number_input("인원수 (명)", min_value=1, value=8)
+    with col_p2:
+        cost_per_person = st.number_input("1인당 단가 (원)", min_value=0, value=50000, step=1000)
+    with col_p3:
+        total_budget = people_count * cost_per_person
+        st.metric(label="자동 계산 총 예산", value=f"{total_budget:,} 원")
+
+    st.markdown("**[채주 지급 계좌 명세정보]**")
+    cc1, cc2 = st.columns(2)
+    with cc1:
+        payee_name = st.text_input("채주명", value="윤성산업개발(주)")
+        bank_name = st.text_input("지급 은행", value="우리은행")
+    with cc2:
+        payee_total = st.number_input("지급 총액 (원)", min_value=0, value=total_budget)
+        account_number = st.text_input("계좌번호", value="1005-xxx-xxxxxx")
     
-    st.divider()
-    st.subheader("💳 3. 채주명세 입금 격자 표 데이터")
+    # 공급가액과 부가세 공식 규격 1.1 분할 계산 자동화
+    calc_supply = int(round(payee_total / 1.1))
+    calc_vat = payee_total - calc_supply
     
-    payee_name = st.text_input("채주명 (입금주/상호)", value="윤성산업개발(주)")
-    payee_total = st.number_input("결제 총 금액 (원)", min_value=0, value=total_budget)
-    
-    default_supply = int(round(payee_total / 1.1))
-    default_vat = payee_total - default_supply
-    
-    col_tax1, col_tax2 = st.columns(2)
-    with col_tax1:
-        supply_value = st.number_input("공급가액 (원)", min_value=0, value=default_supply)
-    with col_tax2:
-        vat = st.number_input("부가세 (원)", min_value=0, value=default_vat)
-        
-    col_bank1, col_bank2 = st.columns(2)
-    with col_bank1:
-        bank_name = st.text_input("금융기관 (은행명)", value="우리은행")
-    with col_bank2:
-        account_number = st.text_input("계좌번호", value="1002-123-456789")
-        
-    st.divider()
-    user_file_name = st.text_input("💾 파일 다운로드 지정 이름 (.pdf 자동 할당)", value="회의비_결재문서_20260226")
+    v_col1, v_col2 = st.columns(2)
+    with v_col1:
+        supply_value = st.number_input("공급가액 (원)", min_value=0, value=calc_supply)
+    with v_col2:
+        vat = st.number_input("부가세 (원)", min_value=0, value=calc_vat)
+
+    user_file_name = st.text_input("💾 저장 파일명 지정 (.pdf 자동 부여)", value="20260226-스마트인프라연구실-이도근_몽골_회의비")
     
     submitted = st.form_submit_button("원형 규격 반영 PDF 빌드하기")
 
@@ -230,18 +264,18 @@ if submitted:
         "account_number": account_number
     }
     
-    with st.spinner("문서 인코딩 및 레이아웃을 빌드 중입니다..."):
+    with st.spinner("문서 인코딩 및 몽골 타당성 조사 레이아웃 최적화 매핑 중..."):
         try:
             pdf = CorporatePDF()
             pdf.draw_form(payload)
             pdf_bytes = bytes(pdf.output())
             
-            st.success("🎉 에러 없이 완벽한 규격의 PDF 빌드가 완료되었습니다! 아래 버튼을 눌러 확인해 보세요.")
+            st.success("🎉 에러 없이 깔끔하게 PDF 빌드가 완료되었습니다!")
             st.download_button(
-                label="💾 완성된 원본 규격 PDF 다운로드",
+                label="📥 찐최종 결재 품의서 PDF 다운로드",
                 data=pdf_bytes,
                 file_name=f"{user_file_name}.pdf",
                 mime="application/pdf"
             )
-        except Exception as e:
-            st.error(f"PDF 생성 중 오류가 발생했습니다: {e}")
+        except Exception as ex:
+            st.error(f"컴파일 중 예외가 발생했습니다: {ex}")
